@@ -22,7 +22,11 @@ from api import views
 
 urlpatterns = [
     path('upload_files/',views.upload_files,name='upload_files'),
+    path('check_server/',views.check_server,name='check_server'),
     path('get_files/<str:pk>',views.get_all_files,name='get_files'),
+    path('get_space_used/<str:pk>',views.get_space_used,name='get_space_used'),
+    path('get_user_data/<str:pk>',views.get_user_data,name='get_user_data'),
+    path('create_new_user/',views.create_new_user,name='create_new_user'),
     path('admin/', admin.site.urls),
 ]
 

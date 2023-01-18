@@ -22,3 +22,11 @@ class FileListSterializer(serializers.Serializer):
             file_objs.append(file_ob)
 
         return validated_data
+
+class UserSterializer(serializers.Serializer):
+    uid = serializers.CharField()
+    email = serializers.EmailField()
+    premium = serializers.BooleanField(required=False)
+    used_space = serializers.DecimalField(max_digits=10,decimal_places=3,required=False)
+    def create(self, validated_data):
+        return  User.objects.create(**validated_data)
