@@ -18,6 +18,7 @@ from django.urls import path
 from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+
 from api import views
 
 urlpatterns = [
@@ -27,6 +28,12 @@ urlpatterns = [
     path('get_space_used/<str:pk>',views.get_space_used,name='get_space_used'),
     path('get_user_data/<str:pk>',views.get_user_data,name='get_user_data'),
     path('create_new_user/',views.create_new_user,name='create_new_user'),
+    path('stripe_home/<str:user_id>', views.home, name='stripe_home'),
+    path('config/', views.stripe_config,name='config'),
+    path('success/', views.success,name='success'),  # new
+    path('cancel/', views.cancel,name='cancel'),
+    path('create-checkout-session/<str:user_id>', views.create_checkout_session,name='create-checkout-session'),
+    path('webhook/', views.stripe_webhook,name='webhook'),
     path('admin/', admin.site.urls),
 ]
 

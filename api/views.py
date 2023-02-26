@@ -9,8 +9,14 @@ from .serializers import *
 from firebase_admin import auth,credentials
 from django.conf import settings
 import os
+import stripe
+from .models import StripeSubscriber
+from django.views.decorators.csrf import csrf_exempt
+
 firebase_creds = credentials.Certificate(settings.FIREBASE_CONFIG)
 firebase_app = firebase_admin.initialize_app(firebase_creds)
+
+
 @api_view(['POST'])
 def upload_files(request):
     try:
@@ -54,8 +60,8 @@ def get_all_files(request, pk):
         # print(decoded_token)
         print(pk)
         folder_path = f'./media/{pk}'
-
-        url = f'http://127.0.0.1:8000/media/{pk}/'
+        ip = '192.168.245.33'
+        url = f'http://{ip}:8000/media/{pk}/'
         urls = []
         try:
             for filename in os.listdir(folder_path):
@@ -126,7 +132,104 @@ def create_new_user(request):
 def check_server(request):
     return Response({'response':'Server Running'})
 
+@api_view(['GET'])
+def stripe_config(request):
+    stripe_config = {'publicKey': settings.STRIPE_PUBLISHABLE_KEY}
+    return Response(stripe_config)
 
+@api_view(['GET'])
+def create_checkout_session(request,user_id):
+    print('create checkout session')
+    print(user_id)
+    domain_url = 'http://localhost:8000/'
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    print(request.user.id)
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            client_reference_id=user_id,
+            success_url=domain_url + 'success',
+            cancel_url=domain_url + f'stripe_home/{user_id}',
+            payment_method_types=['card'],
+            mode='subscription',
+            line_items=[
+                {
+                    'price': settings.STRIPE_PRICE_ID,
+                    'quantity': 1,
+                }
+            ]
+        )
+
+        return Response({'sessionId': checkout_session['id']})
+    except Exception as e:
+        return Response({'error': str(e)})
+
+@api_view(['GET'])
+def home(request,user_id):
+    context={'user_id':user_id}
+    return render(request, 'api/home.html',context)
+
+@api_view(['GET'])
+def success(request):
+    return render(request, 'api/success.html')
+
+
+@api_view(['GET'])
+def cancel(request):
+    return render(request, 'api/cancel.html')
+
+@csrf_exempt
+@api_view(['POST'])
+def stripe_webhook(request):
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    endpoint_secret = settings.STRIPE_ENDPOINT_SECRET
+    payload = request.body
+    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+    event = None
+    print('gg')
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+        print('ggfd')
+    except ValueError as e:
+        # Invalid payload
+        return Response(status=400)
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        return Response(status=400)
+
+    # Handle the checkout.session.completed event
+    print('gg')
+    print(event['type'])
+    if event['type'] == 'checkout.session.completed':
+
+        session = event['data']['object']
+
+        # Fetch all the required data from session
+        client_reference_id = session.get('client_reference_id')
+
+        stripe_customer_id = session.get('customer')
+
+        stripe_subscription_id = session.get('subscription')
+
+        # Get the user and create a new StripeCustomer
+        subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        print(subscription)
+        user = User.objects.get(uid=client_reference_id)
+        #TODO: add user from table to stripecostemer table
+        start_date = subscription['current_period_start']
+        end_date = subscription['current_period_end']
+        stripe_costomer = StripeSubscriber(
+            user=user,
+            stripeCustomerId=stripe_customer_id,
+            stripeSubscriptionId=stripe_subscription_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        stripe_costomer.save()
+        print(' just subscribed.')
+
+    return Response(status=200)
 # Create your views here.
 
 
