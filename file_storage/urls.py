@@ -34,6 +34,8 @@ urlpatterns = [
     path('cancel/', views.cancel,name='cancel'),
     path('create-checkout-session/<str:user_id>', views.create_checkout_session,name='create-checkout-session'),
     path('webhook/', views.stripe_webhook,name='webhook'),
+    path('subcribtion_details/<str:user_id>', views.subcribtion_details,name='subcribtion_details'),
+    path('cancel_subcribtion/<str:user_id>', views.cancel_subcribtion,name='cancel_subcribtion'),
     path('admin/', admin.site.urls),
 ]
 

@@ -20,12 +20,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-
+SECRET_KEY = 'django-insecure-7jmil4*sk*f*65-&7hw6yvta^=v3sef_l!h_bpi2ssyhuxvs)0'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.197.33','localhost','127.0.0.1','192.168.245.33']
+ALLOWED_HOSTS = ['192.168.197.33','localhost','127.0.0.1','192.168.245.33','192.168.175.33']
 
 
 # Application definition
@@ -148,3 +148,7 @@ MEDIA_URL = '/media/'
 FIREBASE_CONFIG = os.path.join(BASE_DIR,'firebase-config.json')
 
 
+STRIPE_PUBLISHABLE_KEY = 'pk_test_51MRURRSAEptBHDe269YD4mj3qbQFckK21D4UWBeb8oueBJL1qIVxngy3Fc7w4zHfm7dChdH8RvfVffgcswkLHL8Z00FOM1HDAu'
+STRIPE_SECRET_KEY = 'sk_test_51MRURRSAEptBHDe2tzQXGUtjWWt1uaJT0RA8g0d5owRLeWG5v5skLnMfqqJAgfgyahbVBy3OY19ehom360MlRzIP00Z0Y7xPKZ'
+STRIPE_PRICE_ID = 'price_1MS0OaSAEptBHDe2W4UJZxzp'
+STRIPE_ENDPOINT_SECRET = 'whsec_2c9827b4b008fc2235ee93273389b3f42073160a9ced4c0a9bbacc8d2647079e'

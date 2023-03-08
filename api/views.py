@@ -60,7 +60,7 @@ def get_all_files(request, pk):
         # print(decoded_token)
         print(pk)
         folder_path = f'./media/{pk}'
-        ip = '192.168.245.33'
+        ip = '192.168.175.33'
         url = f'http://{ip}:8000/media/{pk}/'
         urls = []
         try:
@@ -140,8 +140,9 @@ def stripe_config(request):
 @api_view(['GET'])
 def create_checkout_session(request,user_id):
     print('create checkout session')
+    ip = '192.168.245.33'
     print(user_id)
-    domain_url = 'http://localhost:8000/'
+    domain_url = f'http://{ip}:8000/'
     stripe.api_key = settings.STRIPE_SECRET_KEY
     print(request.user.id)
     try:
@@ -176,6 +177,49 @@ def success(request):
 @api_view(['GET'])
 def cancel(request):
     return render(request, 'api/cancel.html')
+
+@api_view(['GET'])
+def subcribtion_details(request,user_id):
+    user = User.objects.get(uid=user_id);
+    if not user.premium:
+        return Response({
+            'subcribtion_status':False
+        })
+    else:
+        subcribtion_details = StripeSubscriber.objects.get(user=user)
+        return Response({
+            'subcribtion_status':True,
+            'subcribtion_details':{
+                'cancelled':subcribtion_details.cancelled,
+                'end_time':subcribtion_details.end_time
+            }
+        })
+
+@api_view(['POST'])
+def cancel_subcribtion(request,user_id):
+    user = User.objects.get(uid=user_id);
+    if not user.premium:
+        return Response({
+            'subcribtion_status':False
+        })
+    else:
+        try:
+            subcribtion_details = StripeSubscriber.objects.get(user=user)
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            stripe.Subscription.delete(subcribtion_details.stripeSubscriptionId)
+            subcribtion_details.cancelled = True
+            subcribtion_details.save()
+            return Response({
+                'subcribtion_status':True,
+                'subcribtion_details':{
+                    'cancelled':subcribtion_details.cancelled,
+                    'end_time':subcribtion_details.end_time
+                }
+            })
+        except Exception as e:
+            return Response({
+                'error':str(e)
+            })
 
 @csrf_exempt
 @api_view(['POST'])
@@ -216,6 +260,9 @@ def stripe_webhook(request):
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
         print(subscription)
         user = User.objects.get(uid=client_reference_id)
+        print(user)
+        user.premium = True
+        user.save()
         #TODO: add user from table to stripecostemer table
         start_date = subscription['current_period_start']
         end_date = subscription['current_period_end']
@@ -223,8 +270,8 @@ def stripe_webhook(request):
             user=user,
             stripeCustomerId=stripe_customer_id,
             stripeSubscriptionId=stripe_subscription_id,
-            start_date=start_date,
-            end_date=end_date
+            start_time=start_date,
+            end_time=end_date
         )
         stripe_costomer.save()
         print(' just subscribed.')

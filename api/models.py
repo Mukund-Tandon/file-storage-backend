@@ -35,6 +35,7 @@ class StripeSubscriber(models.Model):
     stripeSubscriptionId = models.CharField(max_length=255)
     start_time = models.CharField(max_length=255,default='0')
     end_time = models.CharField(max_length=255,default='0')
+    cancelled = models.BooleanField(default=False)
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         channel_layer=get_channel_layer()
         data={'status':'completed'}
@@ -49,3 +50,6 @@ class StripeSubscriber(models.Model):
 
     def __str__(self):
         return self.user.email
+
+
+#./stripe listen --forward-to localhost:8000/webhook/
