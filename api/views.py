@@ -1,9 +1,13 @@
-import firebase_admin
-from django.shortcuts import render
+import decimal
 
+import firebase_admin
+from django.core.exceptions import ObjectDoesNotExist
+from django.http import FileResponse
+from django.shortcuts import render
+import time
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
+from django.shortcuts import get_object_or_404
 from .serializers import *
 
 from firebase_admin import auth,credentials
@@ -29,14 +33,19 @@ def upload_files(request):
         print('jjhkjh')
         serializer = FileListSterializer(data=data)
         print(serializer)
+        user = User.objects.get(email=data['uploaded_by'])
         if serializer.is_valid():
             serializer.save()
-
+            print('file valid')
+            upload_file = request.FILES['files']
+            print(upload_file.size)
+            user.used_space = user.used_space +  decimal.Decimal(upload_file.size/1e9)
+            user.save()
             return Response({
                 'status': 200,
                 'message': 'files uploaded successfully',
             })
-
+        print('file invalid')
         return Response({
             'status': 400,
             'message': 'something went wrong',
@@ -47,33 +56,112 @@ def upload_files(request):
 
     return Response({'no': 'nope'})
 
+@api_view(['GET'])
+def get_file(request,email,file_name):
+    try:
+        auherization_header = request.META.get('HTTP_AUTHORIZATION')
+        print(auherization_header)
+        token = auherization_header.replace("Bearer ", "")
+        print(token)
+
+        decoded_token = auth.verify_id_token(token)
+        print(decoded_token)
+        file_instance = get_object_or_404(File, file__icontains=file_name, uploaded_by=email)
+
+        return FileResponse(file_instance.file, filename=file_name)
+    except :
+        return Response({
+            'status': 400,
+            'message': 'file not found',
+        })
 
 @api_view(['GET'])
-def get_all_files(request, pk):
+def get_sharable_file(request,email,file_name):
+    try:
+
+        file_instance = get_object_or_404(File, file__icontains=file_name, uploaded_by=email)
+        if file_instance.sharable:
+            return FileResponse(file_instance.file, filename=file_name)
+        return Response({
+            'status': 400,
+            'message': 'file not found',
+        })
+    except :
+        return Response({
+            'status': 400,
+            'message': 'file not found',
+        })
+@api_view(['PATCH'])
+def update_file_visibility(request,email,file_name,value):
     try:
         # auherization_header = request.META.get('HTTP_AUTHORIZATION')
         # print(auherization_header)
-        # # token = auherization_header.replace("Bearer ", "")
-        # # print(token)
+        # token = auherization_header.replace("Bearer ", "")
+        # print(token)
         #
-        # decoded_token = auth.verify_id_token(auherization_header)
+        # decoded_token = auth.verify_id_token(token)
         # print(decoded_token)
-        print(pk)
+        file_instance = get_object_or_404(File, file__icontains=file_name, uploaded_by=email)
+        file_sharable = True
+        if value.lower() == 'false':
+            file_sharable = False
+
+        if file_sharable != file_instance.sharable:
+            file_instance.sharable = file_sharable
+            file_instance.save()
+
+        return Response({
+            'status': 200,
+            'message': 'file updated successfully',
+        })
+    except :
+        return Response({
+            'status': 400,
+            'message': 'file not found',
+        })
+@api_view(['GET'])
+def get_all_files(request, pk):
+
+    try:
+        # auherization_header = request.META.get('HTTP_AUTHORIZATION')
+        # print(auherization_header)
+        # token = auherization_header.replace("Bearer ", "")
+        # print(token)
+        #
+        # decoded_token = auth.verify_id_token(token)
+        # print(decoded_token)
+        # print(pk)
         folder_path = f'./media/{pk}'
-        ip = '192.168.175.33'
-        url = f'http://{ip}:8000/media/{pk}/'
-        urls = []
+        ip = '192.168.135.33'
+        url = f'http://{ip}:8000/get_file/{pk}/'
+        sharable_url_base = f'http://{ip}:8000/get_sharable_file/{pk}/'
+        #django code to return all rows in file table fro a partucular table
+        rows = File.objects.filter(uploaded_by=pk).order_by('-created_at')
+        print(rows)
+        files = []
+        # for row in rows:
+        #     fileName = os.path.basename(row.file.name)
+        #     fileUrl = url + fileName
+        #     fileCreationTime = row.created_at
+        #     files.append({'name':fileName,'url':fileUrl,'created_at':fileCreationTime})
         try:
-            for filename in os.listdir(folder_path):
-                print(filename)
-                urls.append(url + filename)
+            for row in rows:
+                fileName = os.path.basename(row.file.name)
+                fileType = 'notImage'
+                if fileName.endswith('.jpg') or fileName.endswith('.png') or fileName.endswith('.jpeg') or fileName.endswith('.gif'):
+                    fileType = 'image'
+                fileUrl = url + fileName
+                sharable_url = sharable_url_base + fileName
+                fileCreationTime = row.created_at
+                files.append({'name': fileName, 'url': fileUrl,'fileType':fileType ,'created_at': fileCreationTime,'sharable_url':sharable_url,'sharable':row.sharable})
         except:
             print('jj')
             os.mkdir(f'media/{pk}')
             print('kk')
 
-        return Response({'goood': urls})
+        return Response({'good': files})
     except Exception as e:
+        print('Error in  get_all_files')
         print(e)
         return Response({'no': 'nope'})
 
@@ -182,18 +270,33 @@ def cancel(request):
 def subcribtion_details(request,user_id):
     user = User.objects.get(uid=user_id);
     if not user.premium:
+        print('user not premium')
         return Response({
             'subcribtion_status':False
         })
     else:
-        subcribtion_details = StripeSubscriber.objects.get(user=user)
-        return Response({
-            'subcribtion_status':True,
-            'subcribtion_details':{
-                'cancelled':subcribtion_details.cancelled,
-                'end_time':subcribtion_details.end_time
-            }
-        })
+        subcriber = StripeSubscriber.objects.get(user=user)
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        subcribtion_details = stripe.Subscription.retrieve(subcriber.stripeSubscriptionId)
+        print(subcribtion_details)
+        if subcribtion_details['status'] == 'active':
+            return Response({
+                'subcribtion_status':True,
+                'subcribtion_details':{
+                    'cancelled':subcriber.cancelled,
+                    'end_time':subcribtion_details['current_period_end']
+                }
+            })
+        else:
+            subcriber.cancelled = True
+            subcriber.save()
+            user.premium = False
+            user.save()
+            return Response({
+                'subcribtion_status': False
+            })
+
+
 
 @api_view(['POST'])
 def cancel_subcribtion(request,user_id):
@@ -229,7 +332,7 @@ def stripe_webhook(request):
     payload = request.body
     sig_header = request.META['HTTP_STRIPE_SIGNATURE']
     event = None
-    print('gg')
+
     try:
         event = stripe.Webhook.construct_event(
             payload, sig_header, endpoint_secret
@@ -243,8 +346,7 @@ def stripe_webhook(request):
         return Response(status=400)
 
     # Handle the checkout.session.completed event
-    print('gg')
-    print(event['type'])
+
     if event['type'] == 'checkout.session.completed':
 
         session = event['data']['object']
@@ -258,22 +360,48 @@ def stripe_webhook(request):
 
         # Get the user and create a new StripeCustomer
         subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+        print('Subbibtion details')
         print(subscription)
         user = User.objects.get(uid=client_reference_id)
         print(user)
         user.premium = True
         user.save()
+        user = User.objects.get(uid=client_reference_id)
+        print(user)
         #TODO: add user from table to stripecostemer table
         start_date = subscription['current_period_start']
         end_date = subscription['current_period_end']
-        stripe_costomer = StripeSubscriber(
-            user=user,
-            stripeCustomerId=stripe_customer_id,
-            stripeSubscriptionId=stripe_subscription_id,
-            start_time=start_date,
-            end_time=end_date
-        )
-        stripe_costomer.save()
+        try:
+            subcriber = StripeSubscriber.objects.get(user=user)
+            print(subcriber)
+            print('subcriber exists')
+            subcriber.stripeCustomerId = stripe_customer_id
+            subcriber.stripeSubscriptionId = stripe_subscription_id
+            subcriber.start_time = start_date
+            subcriber.end_time = end_date
+            subcriber.cancelled = False
+            subcriber.save()
+        except ObjectDoesNotExist:
+            print('subcriber not exists')
+            stripe_costomer = StripeSubscriber(
+                user=user,
+                stripeCustomerId=stripe_customer_id,
+                stripeSubscriptionId=stripe_subscription_id,
+                start_time=start_date,
+                end_time=end_date,
+            )
+            stripe_costomer.save()
+
+
+        # stripe_costomer = StripeSubscriber.objects.update_or_create(
+        #     user=user,
+        #     stripeCustomerId=stripe_customer_id,
+        #     stripeSubscriptionId=stripe_subscription_id,
+        #     start_time=start_date,
+        #     end_time=end_date,
+        #     cancelled=False
+        # )
+        # stripe_costomer.save()
         print(' just subscribed.')
 
     return Response(status=200)

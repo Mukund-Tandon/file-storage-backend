@@ -13,7 +13,7 @@ class User(models.Model):
     uid = models.CharField(primary_key=True ,max_length=100)
     email = models.EmailField(unique=True)
     premium = models.BooleanField(default=False)
-    used_space = models.DecimalField(max_digits=10,decimal_places=3,default=0.0)
+    used_space = models.DecimalField(max_digits=10,decimal_places=6,default=0.0)
 
     def __str__(self):
         return self.email
@@ -28,6 +28,7 @@ class File(models.Model):
     uploaded_by = models.EmailField()
     file = models.FileField(upload_to=get_upload_path)
     created_at = models.DateTimeField(auto_now=True)
+    sharable = models.BooleanField(default=True)
 
 class StripeSubscriber(models.Model):
     user = models.OneToOneField(to=User, on_delete=models.CASCADE,default=None)

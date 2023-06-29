@@ -36,6 +36,9 @@ urlpatterns = [
     path('webhook/', views.stripe_webhook,name='webhook'),
     path('subcribtion_details/<str:user_id>', views.subcribtion_details,name='subcribtion_details'),
     path('cancel_subcribtion/<str:user_id>', views.cancel_subcribtion,name='cancel_subcribtion'),
+    path('get_file/<str:email>/<str:file_name>', views.get_file, name='get_file'),
+    path('get_sharable_file/<str:email>/<str:file_name>', views.get_sharable_file, name='get_sharable_file'),
+    path('update_file_visibility/<str:email>/<str:file_name>/<str:value>', views.update_file_visibility, name='update_file_visibility'),
     path('admin/', admin.site.urls),
 ]
 
